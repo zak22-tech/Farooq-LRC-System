@@ -1,0 +1,13 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /learning_resources_app/main {
+      allow read: if true;
+      allow create, update: if
+        request.resource.data.keys().hasAll(['bookings', 'subjects', 'schoolName']) &&
+        request.resource.data.bookings is list &&
+        request.resource.data.subjects is list &&
+        request.resource.data.schoolName is string;
+    }
+  }
+}

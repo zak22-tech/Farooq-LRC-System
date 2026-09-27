@@ -61,11 +61,31 @@ const syncReady = initializeSync();
 
 async function createBooking(booking) {
   await syncReady;
-  const item = cleanBooking(sanitize(booking));
-  if (!item.id || !item.hall || !item.teacher || !item.subject || !item.grade || !item.section || !item.period || !item.date) throw new Error("بيانات الحجز غير مكتملة");
+  const source = booking && typeof booking === "object" ? booking : {};
+  const item = cleanBooking({
+    id: String(source.id || "").trim(),
+    hall: String(source.hall || DEFAULT_HALL).trim(),
+    teacher: String(source.teacher || "").trim(),
+    subject: String(source.subject || "").trim(),
+    grade: String(source.grade || "").trim(),
+    section: Number(source.section),
+    period: Number(source.period),
+    date: String(source.date || "").trim()
+  });
+  if (!item.id || !item.hall || !item.teacher || !item.subject || !item.grade || !Number.isInteger(item.section) || !Number.isInteger(item.period) || !item.date) {
+    const error = new Error("بيانات الحجز غير مكتملة أو غير صالحة");
+    error.code = "invalid-booking-data";
+    throw error;
+  }
   const allowedSections = { "10": 7, "11": 11, "12": 11 };
-  if (!allowedSections[String(item.grade)] || Number(item.section) < 1 || Number(item.section) > allowedSections[String(item.grade)]) throw new Error("الصف أو الشعبة غير صحيحة");
-  const result = await runTransaction(db, async tx => {
+  if (!allowedSections[item.grade] || item.section < 1 || item.section > allowedSections[item.grade]) {
+    const error = new Error("الصف أو الشعبة غير صحيحة");
+    error.code = "invalid-grade-section";
+    throw error;
+  }
+  let result;
+  try {
+    result = await runTransaction(db, async tx => {
     const snap = await tx.get(stateRef);
     const remote = normalize(snap.exists() ? snap.data() : {});
     if (remote.bookings.some(existing => String(existing.id) !== String(item.id) && sameSlot(existing, item))) {
@@ -75,8 +95,16 @@ async function createBooking(booking) {
     }
     const merged = { ...remote, schoolName: "مدرسة الفاروق", bookings: [...remote.bookings, item] };
     tx.set(stateRef, { ...sanitize(merged), updatedAt: serverTimestamp() }, { merge: true });
-    return merged;
-  });
+      return merged;
+    });
+  } catch (error) {
+    console.error("Firebase booking commit failed", {
+      code: error?.code || "unknown",
+      message: error?.message || String(error),
+      booking: item
+    });
+    throw error;
+  }
   publish(result, { syncStatus: "saved", savedBookingId: String(item.id) });
   return result;
 }
