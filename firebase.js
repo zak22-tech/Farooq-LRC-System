@@ -17,14 +17,16 @@ const stateRef = doc(db, "learning_resources_app", "main");
 const DEFAULT_HALL = "مركز مصادر التعلم";
 const DEFAULT_SUBJECTS = ["اللغة العربية","اللغة الإنجليزية","الرياضيات","العلوم والبيئة","الفيزياء","الأحياء","الكيمياء","تقنية المعلومات","الدراسات الاجتماعية","التربية الإسلامية","الفنون التشكيلية","المهارات الموسيقية","الرياضة المدرسية"];
 
-const cleanBooking = item => ({ ...item, hall: item?.hall || DEFAULT_HALL });
+const cleanBooking = item => ({ ...item, hall: String(item?.hall || DEFAULT_HALL).trim() });
 const normalize = (state = {}) => ({
   bookings: Array.isArray(state.bookings) ? state.bookings.filter(Boolean).map(cleanBooking) : [],
   subjects: Array.isArray(state.subjects) && state.subjects.length ? state.subjects : DEFAULT_SUBJECTS,
   schoolName: "مدرسة الفاروق"
 });
 const sanitize = value => JSON.parse(JSON.stringify(value));
-const sameSlot = (a, b) => String(a?.hall || DEFAULT_HALL) === String(b?.hall || DEFAULT_HALL) && String(a?.date || "") === String(b?.date || "") && Number(a?.period) === Number(b?.period);
+const normalizeHall = value => String(value || DEFAULT_HALL).trim();
+const bookingSlotKey = item => `${normalizeHall(item?.hall)}|${String(item?.date || "").trim()}|${Number(item?.period)}`;
+const sameSlot = (a, b) => bookingSlotKey(a) === bookingSlotKey(b);
 
 function publish(state, extra = {}) {
   window.dispatchEvent(new CustomEvent("firebase-state-updated", { detail: { ...normalize(state), ...extra } }));
