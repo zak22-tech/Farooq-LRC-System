@@ -1,10 +1,11 @@
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  initializeFirestore, doc, getDoc, setDoc, onSnapshot,
+  initializeFirestore, doc, getDocFromServer, onSnapshot,
   runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+
 const firebaseConfig = {
   apiKey: "AIzaSyCTqGF08fB0nqvEanqbs62VOL11aZETjls",
   authDomain: "al-farooq-school-hall-booking.firebaseapp.com",
@@ -24,6 +25,11 @@ const KEYS = new Set([
   "final_owner_v5", "final_notif_email", "final_notif_phone"
 ]);
 const BOOKING_KEY = "final_bookings_v5";
+
+// Never let data saved by a previous deployment initialize a different database.
+// The server is authoritative; localStorage is only a UI mirror after a successful read.
+for (const key of KEYS) localStorage.removeItem(key);
+
 
 let ready = false;
 let applyingRemote = false;
@@ -123,7 +129,8 @@ async function saveChanges() {
     .map(([, item]) => item);
 
   try {
-    const result = await withRetry(() => runTransaction(db, async transaction => {
+    // Firestore يعيد محاولة المعاملة تلقائياً عند التعارض، لذلك نتجنب إعادة المحاولة الخارجية التي تزيد التأخير على الجوال.
+  const result = await runTransaction(db, async transaction => {
       const snap = await transaction.get(stateRef);
       const remote = normalize(snap.exists() ? snap.data() : {});
       const remoteMap = bookingMap(remote.bookings);
@@ -154,7 +161,7 @@ async function saveChanges() {
       }, { merge: true });
 
       return { merged, rejectedIds };
-    }));
+    });
 
     applyRemote(result.merged, false);
     publish(result.merged, {
@@ -165,7 +172,7 @@ async function saveChanges() {
   } catch (error) {
     console.error("Firebase save failed:", error);
     try {
-      const latest = await getDoc(stateRef);
+      const latest = await getDocFromServer(stateRef);
       if (latest.exists()) applyRemote(latest.data(), true);
     } catch (refreshError) {
       console.error("Firebase refresh failed:", refreshError);
@@ -204,46 +211,41 @@ Storage.prototype.removeItem = function(key) {
 
 async function initializeSync() {
   try {
-    const first = await getDoc(stateRef);
-    if (first.exists()) {
-      applyRemote(first.data(), true);
-    } else {
-      const initial = localState();
-      await setDoc(stateRef, { ...initial, updatedAt: serverTimestamp() }, { merge: true });
-      baseline = initial;
-      publish(initial);
-    }
-
+    // A server-only read prevents old cached data from being treated as current.
+    const first = await getDocFromServer(stateRef);
+    // An absent document means an empty new database, never an import from localStorage.
+    applyRemote(first.exists() ? first.data() : {}, true);
     ready = true;
 
     onSnapshot(stateRef, snapshot => {
-      if (!snapshot.exists()) return;
-      const remote = normalize(snapshot.data());
-      if (saving) return;
+      // Cached or locally pending snapshots must not replace confirmed server data.
+      if (snapshot.metadata.fromCache || snapshot.metadata.hasPendingWrites || saving) return;
+      const remote = normalize(snapshot.exists() ? snapshot.data() : {});
       if (!equal(remote, localState())) applyRemote(remote, true);
       else baseline = remote;
     }, error => console.error("Firebase live sync failed:", error));
 
     window.addEventListener("online", async () => {
       try {
-        const latest = await getDoc(stateRef);
-        if (latest.exists() && !saving) applyRemote(latest.data(), true);
-        await saveChanges();
+        const latest = await getDocFromServer(stateRef);
+        if (!saving) applyRemote(latest.exists() ? latest.data() : {}, true);
       } catch (error) {
         console.error("Firebase reconnect failed:", error);
       }
     });
   } catch (error) {
-    ready = true;
+    ready = false;
+    window.firebaseSyncError = error;
     console.error("Firebase initialization failed:", error);
-    publish(localState(), { force: true, syncStatus: "offline" });
+    applyRemote({}, false);
+    publish({}, { force: true, syncStatus: "offline" });
   }
 }
-
 const syncReady = initializeSync();
 
 async function createBooking(booking) {
   await syncReady;
+  if (!ready) throw new Error("تعذر الاتصال بقاعدة البيانات؛ لم يُحفظ الحجز");
   if (!booking || booking.id == null) throw new Error("بيانات الحجز غير مكتملة");
   booking = sanitize(booking);
 
@@ -262,8 +264,11 @@ async function createBooking(booking) {
     }
     remoteMap.set(String(booking.id), booking);
     const merged = { ...remote, bookings: [...remoteMap.values()] };
-    transaction.set(stateRef, sanitize(merged), { merge: true });
-    transaction.set(stateRef, { updatedAt: serverTimestamp() }, { merge: true });
+    // نرسل الحقول المتغيرة فقط في عملية كتابة واحدة لتقليل حجم الطلب وزمن الاستجابة.
+    transaction.set(stateRef, {
+      bookings: sanitize(merged.bookings),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
     return merged;
   }));
 
