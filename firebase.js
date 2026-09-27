@@ -4,7 +4,7 @@ import {
   runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
-
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyCTqGF08fB0nqvEanqbs62VOL11aZETjls",
   authDomain: "al-farooq-school-hall-booking.firebaseapp.com",
@@ -123,8 +123,7 @@ async function saveChanges() {
     .map(([, item]) => item);
 
   try {
-    // Firestore يعيد محاولة المعاملة تلقائياً عند التعارض، لذلك نتجنب إعادة المحاولة الخارجية التي تزيد التأخير على الجوال.
-  const result = await runTransaction(db, async transaction => {
+    const result = await withRetry(() => runTransaction(db, async transaction => {
       const snap = await transaction.get(stateRef);
       const remote = normalize(snap.exists() ? snap.data() : {});
       const remoteMap = bookingMap(remote.bookings);
@@ -263,13 +262,10 @@ async function createBooking(booking) {
     }
     remoteMap.set(String(booking.id), booking);
     const merged = { ...remote, bookings: [...remoteMap.values()] };
-    // نرسل الحقول المتغيرة فقط في عملية كتابة واحدة لتقليل حجم الطلب وزمن الاستجابة.
-    transaction.set(stateRef, {
-      bookings: sanitize(merged.bookings),
-      updatedAt: serverTimestamp()
-    }, { merge: true });
+    transaction.set(stateRef, sanitize(merged), { merge: true });
+    transaction.set(stateRef, { updatedAt: serverTimestamp() }, { merge: true });
     return merged;
-  });
+  }));
 
   applyRemote(result, false);
   publish(result, { force: true, syncStatus: "saved", savedBookingId: String(booking.id) });
