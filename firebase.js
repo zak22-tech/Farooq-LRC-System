@@ -4,14 +4,15 @@ import {
   runTransaction, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
+
 const firebaseConfig = {
-  apiKey: "AIzaSyAqwkxA3PpDY_LDJqOePlySPY8KBWTGtZY",
-  authDomain: "zak1-6cfb9.firebaseapp.com",
-  projectId: "zak1-6cfb9",
-  storageBucket: "zak1-6cfb9.firebasestorage.app",
-  messagingSenderId: "633095299612",
-  appId: "1:633095299612:web:b1fc8f6f45ab0067cdb5d9",
-  measurementId: "G-HXM48K86X3"
+  apiKey: "AIzaSyCTqGF08fB0nqvEanqbs62VOL11aZETjls",
+  authDomain: "al-farooq-school-hall-booking.firebaseapp.com",
+  projectId: "al-farooq-school-hall-booking",
+  storageBucket: "al-farooq-school-hall-booking.firebasestorage.app",
+  messagingSenderId: "392364390397",
+  appId: "1:392364390397:web:110fbd6ff5f19304510b94",
+  measurementId: "G-579H6X2H6M"
 };
 
 const app = initializeApp(firebaseConfig);
