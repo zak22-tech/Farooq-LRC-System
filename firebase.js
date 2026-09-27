@@ -62,7 +62,9 @@ const syncReady = initializeSync();
 async function createBooking(booking) {
   await syncReady;
   const item = cleanBooking(sanitize(booking));
-  if (!item.id || !item.hall || !item.teacher || !item.subject || !item.grade || !item.period || !item.date) throw new Error("بيانات الحجز غير مكتملة");
+  if (!item.id || !item.hall || !item.teacher || !item.subject || !item.grade || !item.section || !item.period || !item.date) throw new Error("بيانات الحجز غير مكتملة");
+  const allowedSections = { "10": 7, "11": 11, "12": 11 };
+  if (!allowedSections[String(item.grade)] || Number(item.section) < 1 || Number(item.section) > allowedSections[String(item.grade)]) throw new Error("الصف أو الشعبة غير صحيحة");
   const result = await runTransaction(db, async tx => {
     const snap = await tx.get(stateRef);
     const remote = normalize(snap.exists() ? snap.data() : {});
