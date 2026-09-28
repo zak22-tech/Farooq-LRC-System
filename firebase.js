@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import { initializeFirestore, doc, getDoc, setDoc, onSnapshot, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCTqGF08fB0nqvEanqbs62VOL11aZETjls",
@@ -13,6 +14,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = initializeFirestore(app, { ignoreUndefinedProperties: true });
+export const auth = getAuth(app);
 const stateRef = doc(db, "learning_resources_app", "main");
 const DEFAULT_HALL = "مركز مصادر التعلم";
 const DEFAULT_SUBJECTS = ["اللغة العربية","اللغة الإنجليزية","الرياضيات","العلوم والبيئة","الفيزياء","الأحياء","الكيمياء","تقنية المعلومات","الدراسات الاجتماعية","التربية الإسلامية","الفنون التشكيلية","المهارات الموسيقية","الرياضة المدرسية"];
@@ -21,7 +23,9 @@ const cleanBooking = item => ({ ...item, hall: String(item?.hall || DEFAULT_HALL
 const normalize = (state = {}) => ({
   bookings: Array.isArray(state.bookings) ? state.bookings.filter(Boolean).map(cleanBooking) : [],
   subjects: Array.isArray(state.subjects) && state.subjects.length ? state.subjects : DEFAULT_SUBJECTS,
-  schoolName: "مدرسة الفاروق"
+  schoolName: "مدرسة الفاروق",
+  blocks: Array.isArray(state.blocks) ? state.blocks.filter(Boolean) : [],
+  managers: state.managers && typeof state.managers === "object" ? state.managers : {}
 });
 const sanitize = value => JSON.parse(JSON.stringify(value));
 const normalizeHall = value => String(value || DEFAULT_HALL).trim();
@@ -93,6 +97,13 @@ async function createBooking(booking) {
       error.code = "booking-conflict";
       throw error;
     }
+    const blocked = remote.blocks.some(block => {
+      const hallMatch = !block.hall || normalizeHall(block.hall) === normalizeHall(item.hall);
+      const dateMatch = !block.date || String(block.date) === item.date;
+      const periodMatch = !block.period || Number(block.period) === Number(item.period);
+      return block.active !== false && hallMatch && dateMatch && periodMatch;
+    });
+    if (blocked) { const error = new Error("هذه القاعة أو الفترة مغلقة بواسطة الإدارة"); error.code = "booking-blocked"; throw error; }
     const merged = { ...remote, schoolName: "مدرسة الفاروق", bookings: [...remote.bookings, item] };
     tx.set(stateRef, { ...sanitize(merged), updatedAt: serverTimestamp() }, { merge: true });
       return merged;
