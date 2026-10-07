@@ -16,10 +16,6 @@
 <main class="main">
 <section id="hallPicker" class="card"><div class="section-title"><div><h2>اختر القاعة المطلوب حجزها</h2><p>ستظهر بعد الاختيار مواعيد وبيانات القاعة المحددة فقط.</p></div></div><div class="hall-grid">
 <button class="hall" data-hall="مركز مصادر التعلم"><span class="icon">📚</span><strong>مركز مصادر التعلم</strong><small>متاح لجميع المواد</small></button>
-<button class="hall" data-hall="مختبر الأحياء"><span class="icon">🧬</span><strong>مختبر الأحياء</strong><small>مخصص لمواد العلوم</small></button>
-<button class="hall" data-hall="مختبر الكيمياء"><span class="icon">⚗️</span><strong>مختبر الكيمياء</strong><small>مخصص لمواد العلوم</small></button>
-<button class="hall" data-hall="مختبر الفيزياء"><span class="icon">🔭</span><strong>مختبر الفيزياء</strong><small>مخصص لمواد العلوم</small></button>
-<button class="hall" data-hall="قاعة الاجتماعات"><span class="icon">🗣️</span><strong>قاعة الاجتماعات</strong><small>متاحة للاجتماعات والحجوزات التعليمية</small></button>
 </div></section>
 <div id="bookingArea" class="hidden">
 <section class="card"><div class="section-title"><div><h2 id="hallTitle"></h2><span class="hall-chip" id="hallChip"></span></div><button id="changeHall" class="btn light">تغيير القاعة</button></div><div class="field" style="max-width:260px"><label>عرض جدول تاريخ</label><input id="viewDate" type="date"></div><div id="periods" class="periods" style="margin-top:16px"></div></section>
@@ -38,7 +34,7 @@
 <div id="todayTicker" class="today-ticker" role="region" aria-label="حجوزات اليوم"><div class="ticker-label"><span aria-hidden="true">📢</span><span>حجوزات اليوم</span></div><div class="ticker-window"><div id="tickerTrack" class="ticker-track no-bookings"><span class="ticker-item">لا توجد حجوزات مسجلة لليوم</span></div></div></div>
 <script type="module" src="./firebase.js"></script>
 <script>
-const HALLS=["مركز مصادر التعلم","مختبر الأحياء","مختبر الكيمياء","مختبر الفيزياء","قاعة الاجتماعات"], SCIENCE=["العلوم والبيئة","الفيزياء","الأحياء","الكيمياء"], PERIODS=["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة","الثامنة"];
+const HALLS=["مركز مصادر التعلم"], SCIENCE=["العلوم والبيئة","الفيزياء","الأحياء","الكيمياء"], PERIODS=["الأولى","الثانية","الثالثة","الرابعة","الخامسة","السادسة","السابعة","الثامنة"];
 let state={bookings:[],subjects:[],blocks:[],managers:{}}, selectedHall=null;
 const $=id=>document.getElementById(id), today=()=>{const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
 $("year").textContent=new Date().getFullYear();$("viewDate").value=$("date").value=today();
